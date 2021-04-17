@@ -257,7 +257,7 @@ contract SynchFinance is ERC20("Synch Genesis Trading Pool", "SGTP"), Owned {
         require(allowWithdraw, "Synch: withdraw has locked");
         require(_share > 0, "Synch: withdraw greater than 0");
         require(balanceOf(_msgSender()) <= _share, "Synch: withdraw more than you have");
-        uint percent = sharePercent();
+        uint percent = sharePercent(_share);
         _burn(_msgSender(), _share);
         
         if (address(this).balance > 0) {
@@ -278,15 +278,15 @@ contract SynchFinance is ERC20("Synch Genesis Trading Pool", "SGTP"), Owned {
     }
     
     function stakeRewards() external view returns (uint) {
-        return sharePercent().mul(synch.balanceOf(address(this))).div(10**18).sub(stakedAmount());
+        return sharePercent(balanceOf(_msgSender())).mul(synch.balanceOf(address(this))).div(10**18).sub(stakedAmount());
     }
     
     function shareToEntryValue(uint _share) external view returns (uint) {
         return _share.mul(sharePrice).div(10**18);
     }
     
-    function sharePercent() public view returns (uint) {
-        return balanceOf(_msgSender()).mul(10**18).div(totalSupply());
+    function sharePercent(uint _share) public view returns (uint) {
+        return _share.mul(10**18).div(totalSupply());
     }
     
     function updateBaseToken(address newBaseToken) external onlyOwner {
@@ -560,3 +560,5 @@ interface IUniswapV2Router02 is IUniswapV2Router01 {
         uint deadline
     ) external;
 }
+
+
