@@ -1,4 +1,4 @@
-// Synch finance team 
+// Synch finance team
 pragma solidity ^0.6.12;
 
 contract Owned {
@@ -159,31 +159,31 @@ contract ERC20 is Context, IERC20 {
     function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual { }
 }
 
-contract SynchFinance is ERC20("Synch Genesis Trading Pool", "SGTP"), Owned {
+contract SynchStandalonePool is ERC20("Synch Trading Pool", "STP"), Owned {
     using SafeMath for uint;
     using SafeERC20 for IERC20;
-    
+
     IERC20 public base; // default as USDC
     IERC20 public synch;
-    
+
     uint public sharePrice;
     uint public allocPrice; // determine how many synch stake required for each base token
-    
+
     bool public allowDeposit;
     bool public allowWithdraw;
-    
+
     address private constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     IUniswapV2Router02 public uniswapRouter;
-    
+
     event UpdateSharePrice(uint previous, uint current);
     event UpdateAllocPrice(uint previous, uint current);
-    
+
     event UpdateDepositStatus(bool current);
     event UpdateWithdrawStatus(bool current);
-    
+
     event UpdateBaseToken(address oldToken, address newToken);
     event TradeToken(address fromToken, address toToken);
-    
+
     constructor () public {
         uniswapRouter = IUniswapV2Router02(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
         base = IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
@@ -193,60 +193,60 @@ contract SynchFinance is ERC20("Synch Genesis Trading Pool", "SGTP"), Owned {
         sharePrice = 10**18;
         allocPrice = 5 * 10**16; // 1 base for 0.05 synch
     }
-    
+
     receive () payable external {}
-    
+
     function approveUniRouter (address token, uint256 _amount) internal {
         IERC20(token).safeApprove(address(uniswapRouter), _amount);
     }
-    
+
     function tradeTokens(address[] memory path, uint amountIn, uint minOut) external onlyOwner returns (uint[] memory) {
         require(!allowDeposit, 'Synch: trade when deposit is locked');
         require(amountIn > 0, "Synch: amountIn is 0");
         require(minOut > 0, "Synch: minOut is 0");
-        
+
         approveUniRouter(path[0], amountIn);
         uint deadline = block.timestamp;
         return uniswapRouter.swapExactTokensForTokens(amountIn, minOut, path, address(this), deadline);
     }
-    
+
     function tradeWithETH(address toToken, uint amountIn, uint minOut) external onlyOwner returns (uint[] memory) {
         require(!allowDeposit, 'Synch: trade when deposit is locked');
         require(amountIn > 0, "Synch: amountIn is 0");
         require(minOut > 0, "Synch: minOut is 0");
-        
+
         address[] memory path = new address[](2);
         path[0] = WETH;
         path[1] = toToken;
-        uint deadline = block.timestamp; 
+        uint deadline = block.timestamp;
         return uniswapRouter.swapETHForExactTokens{ value: amountIn }(minOut, path, address(this), deadline);
     }
-    
+
     function tradeForETH(address fromToken, uint amountIn, uint minOut) external onlyOwner returns (uint[] memory) {
         require(!allowDeposit, 'Synch: trade when deposit is locked');
         require(amountIn > 0, "Synch: amountIn is 0");
         require(minOut > 0, "Synch: minOut is 0");
-        
-        address[] memory path = new address[](2);  
+
+        address[] memory path = new address[](2);
         path[0] = fromToken;
         path[1] = WETH;
-        
+
         approveUniRouter(fromToken, amountIn);
         uint deadline = block.timestamp;
         return uniswapRouter.swapExactTokensForETH(amountIn, minOut, path, address(this), deadline);
     }
-    
+
     // need to approve both base and synch first
     function deposit(uint _amount) external {
         require(allowDeposit, "Synch: deposit is not available");
         require(_amount > 0, "Synch: deposit is 0");
-        
+
         synch.safeTransferFrom(_msgSender(), address(this), _amount.mul(allocPrice).div(10**18));
         base.safeTransferFrom(_msgSender(), address(this), _amount);
         uint _share = _amount.mul(10**18).div(sharePrice);
         _mint(_msgSender(), _share);
     }
-    
+
     /**
      * if no tokens specified, only eth will get withdrew if any, not even synch
      * and your non-specified tokens will automatically transfer to all the other pool members
@@ -259,11 +259,11 @@ contract SynchFinance is ERC20("Synch Genesis Trading Pool", "SGTP"), Owned {
         require(balanceOf(_msgSender()) <= _share, "Synch: withdraw more than you have");
         uint percent = sharePercent(_share);
         _burn(_msgSender(), _share);
-        
+
         if (address(this).balance > 0) {
             _msgSender().transfer(address(this).balance.mul(percent).div(10**18));
         }
-        
+
         for (uint i = 0; i < tokens.length; i ++) {
             IERC20 token = IERC20(tokens[i]);
             uint tokenBalance = token.balanceOf(address(this));
@@ -272,49 +272,49 @@ contract SynchFinance is ERC20("Synch Genesis Trading Pool", "SGTP"), Owned {
             }
         }
     }
-    
+
     function stakedAmount() public view returns (uint) {
         return balanceOf(_msgSender()).mul(allocPrice).div(10**18);
     }
-    
+
     function stakeRewards() external view returns (uint) {
         return sharePercent(balanceOf(_msgSender())).mul(synch.balanceOf(address(this))).div(10**18).sub(stakedAmount());
     }
-    
+
     function shareToEntryValue(uint _share) external view returns (uint) {
         return _share.mul(sharePrice).div(10**18);
     }
-    
+
     function sharePercent(uint _share) public view returns (uint) {
         return _share.mul(10**18).div(totalSupply());
     }
-    
+
     function updateBaseToken(address newBaseToken) external onlyOwner {
         require(!allowDeposit, 'Synch: Only update baseToken when deposit is locked');
         address old = address(base);
         base = IERC20(newBaseToken);
         emit UpdateBaseToken(old, newBaseToken);
     }
-    
+
     function updateSharePrice(uint _newPrice) external onlyOwner {
         require(!allowDeposit, 'Synch: Only change price when deposit is locked');
         uint oldPrice = sharePrice;
         sharePrice = _newPrice;
         emit UpdateSharePrice(oldPrice, _newPrice);
     }
-    
+
     function updateAllocPrice(uint _price) external onlyOwner {
         require(!allowDeposit, 'Synch: Only update alloc price when deposit is locked');
         uint old = allocPrice;
         allocPrice = _price;
         emit UpdateAllocPrice(old, allocPrice);
     }
-    
+
     function toggleAllowDepositStatus() external onlyOwner {
         allowDeposit = !allowDeposit;
         emit UpdateDepositStatus(allowDeposit);
     }
-    
+
     function toggleAllowWithdrawStatus() external onlyOwner {
         allowWithdraw = !allowWithdraw;
         emit UpdateWithdrawStatus(allowWithdraw);
@@ -560,5 +560,3 @@ interface IUniswapV2Router02 is IUniswapV2Router01 {
         uint deadline
     ) external;
 }
-
-

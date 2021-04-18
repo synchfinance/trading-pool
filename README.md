@@ -1,19 +1,15 @@
-# Synch Trading Pool Smart Contract
+# Synch Trading Pool Smart Contracts
 
-This smart contract is in beta, please use for testing purpose only
+These smart contracts are in beta, please use it at your own risk.
 
-First version was tested in the mainnet at March 3, 2021
+First standalone version was tested in the mainnet at March 3, 2021
 
-## Features (Current)
-1. Deposit token can be pre-selected as any ERC20 token
-2. Proportional Withdraw
-3. Deposit Lock
-4. Withdraw Lock
-5. Synch token deposit require for access the pool
-6. Deposited synch receiving airdrop rewards (Farm)
-7. Trade in Uniswap with any pairs
+Auditing has not yet.
 
-## Future Features
-1. Privacy
+## Pool Choices
+1. Standalone pool
+    Does not have any privacy feature. Only 1 smart contract required
+2. Privacy pools
+    System of smart contracts achieving the goal of privacy. Each system has 1 Synch Controller contract in charge of trading and storage and multiple Synch privacy pool contracts in charge of deposit/withdraw, synch security deposit and LP token issuance. Each trade request in Synch Controller has to contain a Keccak256 hash proof to help verify later on that the transaction was genuine
 
 Synch Tech Team
